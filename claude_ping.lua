@@ -50,6 +50,9 @@ M.config = {
 -- ───────────────────────────── Constants ─────────────────────────────
 local CLAUDE_DESKTOP = "com.anthropic.claudefordesktop"
 local HAMMERSPOON    = hs.processInfo.bundleID
+-- The real home folder from the user database. $HOME can be wrong when Hammerspoon was
+-- started from a shell with a different HOME, and then every path below would break.
+local HOME           = hs.fs.pathToAbsolute("~") or os.getenv("HOME") or ""
 
 local APP_NAMES = {
   ["com.microsoft.VSCode"]     = "VS Code",
@@ -175,7 +178,7 @@ end
 -- Project folder names from the deepest one up (stopping at $HOME), because a session can
 -- start in a subfolder while the VS Code window has the parent folder open.
 local function projectNames(project)
-  local names, home = {}, os.getenv("HOME") or ""
+  local names, home = {}, HOME
   local p = (type(project) == "string" and project or ""):gsub("/+$", "")
   while p ~= "" and p ~= home and #names < 4 do
     names[#names + 1] = basename(p)
@@ -208,7 +211,7 @@ local function matchWindow(wins, project)
   end
   -- Session started in a parent folder (e.g. ~/project) while the window has a subfolder open.
   local root = type(project) == "string" and project:gsub("/+$", "") or ""
-  if root ~= "" and root ~= os.getenv("HOME") then
+  if root ~= "" and root ~= HOME then
     for _, w in ipairs(wins) do
       for seg in ((w:title() or "") .. " — "):gmatch("(.-) — ") do
         seg = seg:gsub(" %(Workspace%)$", "")
@@ -1003,7 +1006,7 @@ end
 
 -- Fetch the latest numbers once, right after Claude finishes (anywhere: terminal, VS Code,
 -- Desktop, browser). At most once a minute; nothing runs while Claude is idle.
-local USAGE_SCRIPT = os.getenv("HOME") .. "/.claude/hooks/claude-usage.sh"
+local USAGE_SCRIPT = HOME .. "/.claude/hooks/claude-usage.sh"
 M.usageFetchedAt = 0
 
 function M.fetchUsage(force)
@@ -1019,13 +1022,21 @@ function M.fetchUsage(force)
   end
   M.usageFetchedAt = os.time()
   later(force and 0 or 2, function()   -- give the server time to record the last reply
+    if not hs.fs.attributes(USAGE_SCRIPT) then
+      log("usage meter: script not found at " .. USAGE_SCRIPT .. " (run install.sh again)")
+      return
+    end
     M.usageTask = hs.task.new(USAGE_SCRIPT, function(code, out)
       M.usageTask = nil
-      if code ~= 0 or not out or out == "" then return end
-      local ok, data = pcall(hs.json.decode, out)
-      if ok and type(data) == "table" then M.handleUsage(data) end
+      local ok, data = pcall(hs.json.decode, out or "")
+      if code == 0 and ok and type(data) == "table" then M.handleUsage(data) return end
+      -- Keep the last numbers on screen, but leave a trace so a failure is never silent.
+      log("usage meter: fetch failed (exit " .. tostring(code) .. "); keeping the last numbers")
     end, { "--fetch" })
-    if not M.usageTask:start() then M.usageTask = nil end
+    if not M.usageTask or not M.usageTask:start() then
+      M.usageTask = nil
+      log("usage meter: could not start " .. USAGE_SCRIPT)
+    end
   end)
 end
 

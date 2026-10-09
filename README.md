@@ -149,6 +149,8 @@ hs -c "ClaudePing.debugDesktop(true)"   # list Claude Desktop's button labels in
 
 **A click doesn't jump to the right window.** Every jump is logged in the Hammerspoon Console as `jump: <session> → <window>`. Claude Ping matches the session's project folder against window titles, so the window needs the project folder (or a subfolder) open.
 
+**The usage meter is stuck.** Open the Hammerspoon Console and look for lines starting with `usage meter:`. They say whether the script is missing (run `install.sh` again) or the request failed. Run `~/.claude/hooks/claude-usage.sh --fetch` to see the raw result.
+
 ## Uninstall
 
 ```bash

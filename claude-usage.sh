@@ -10,6 +10,11 @@
 
 [ "${1:-}" = "--fetch" ] || exit 0
 
+# Use the real home folder from the user database: `security` finds the login keychain
+# through $HOME, which can be wrong when Hammerspoon was started from another shell.
+REAL_HOME=$(dscl . -read "/Users/$(id -un)" NFSHomeDirectory 2>/dev/null | sed 's/^NFSHomeDirectory: //')
+[ -d "$REAL_HOME" ] && export HOME="$REAL_HOME"
+
 RAW=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null) || exit 1
 TOK=$(printf '%s' "$RAW" | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null)
 RAW=""

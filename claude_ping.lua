@@ -1163,6 +1163,17 @@ function M.start()
   local desk = hs.application.get(CLAUDE_DESKTOP)
   if desk then setDesktopAX(desk, false) end
 
+  -- No reminder can show while Hammerspoon is closed, and a Mac restart closes it unless
+  -- "Launch Hammerspoon at login" is on. Turn it on once; after that the user's choice in
+  -- Hammerspoon's Preferences is left alone.
+  if not hs.settings.get("claudePing.autoLaunchSet") then
+    hs.settings.set("claudePing.autoLaunchSet", true)
+    if not hs.autoLaunch() then
+      hs.autoLaunch(true)
+      log("turned on Launch Hammerspoon at login (turn it off in Hammerspoon's Preferences)")
+    end
+  end
+
   updateUsageBar()
   scheduleUsageReset()
   M.fetchUsage(true)

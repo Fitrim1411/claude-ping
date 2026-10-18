@@ -66,12 +66,12 @@ open -a Hammerspoon
 ok "Hammerspoon started"
 
 echo
-bold "Almost done — three one-time steps:"
+bold "Almost done — two one-time steps:"
 echo "  1. If Hammerspoon asks for Accessibility access, click Open System Settings and turn it on."
 echo "     (Needed for the Claude Desktop Chat and Code tabs.)"
-echo "  2. Hammerspoon menu bar icon → Preferences → check 'Launch Hammerspoon at login'."
-echo "  3. Click the ◌ icon in the menu bar → 'Show a test reminder'. A green border means it works."
+echo "  2. Click the ◌ icon in the menu bar → 'Show a test reminder'. A green border means it works."
 echo
 echo "  Claude Code picks up the new hooks automatically. If an already-open session doesn't, restart it once."
 echo "  The usage meter (% of the 5-hour limit · time left) appears in the menu bar within a few seconds."
+echo "  'Launch Hammerspoon at login' is turned on so reminders survive a restart (uncheck it in Hammerspoon's Preferences)."
 echo "  For Safari/Chrome: install claude-ping.user.js (see README.md)."

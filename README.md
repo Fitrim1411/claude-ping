@@ -76,11 +76,11 @@ Tested with Hammerspoon 1.1.1, Claude Code 2.1.295, VS Code 1.136 and Claude Des
 
 3. When Hammerspoon asks for **Accessibility** access, turn it on in System Settings. It is needed for Claude Desktop.
 
-4. Open Hammerspoon's **Preferences** from its menu bar icon and check **Launch Hammerspoon at login**.
-
-5. Click the **◌** icon in the menu bar and choose **Show a test reminder**. If a green border appears, you are done.
+4. Click the **◌** icon in the menu bar and choose **Show a test reminder**. If a green border appears, you are done.
 
 Claude Code picks up the new hooks on its own. If an already-open session doesn't react, restart it once.
+
+Claude Ping turns on **Launch Hammerspoon at login** the first time it starts, because no reminder can show while Hammerspoon is closed. If you don't want that, uncheck it in Hammerspoon's **Preferences**.
 
 The first time you jump to a Safari or Chrome tab, macOS asks if Hammerspoon may control the browser. Click **Allow**.
 
@@ -148,6 +148,8 @@ hs -c "ClaudePing.debugDesktop(true)"   # list Claude Desktop's button labels in
 **Claude Desktop isn't detected.** Send a long message in Claude Desktop. While it is still answering, choose **Debug: check Claude Desktop buttons** from the ◌ menu. The Hammerspoon Console opens with a list of button labels. Add the stop button's label, in lowercase, to `stopLabels` in `M.config`, then reload.
 
 **A click doesn't jump to the right window.** Every jump is logged in the Hammerspoon Console as `jump: <session> → <window>`. Claude Ping matches the session's project folder against window titles, so the window needs the project folder (or a subfolder) open.
+
+**Everything disappeared from the menu bar.** Hammerspoon is not running, usually after a restart with **Launch Hammerspoon at login** turned off. Open Hammerspoon and check that option in its **Preferences**. Reminders that were showing before it closed are not kept.
 
 **The usage meter is stuck.** Open the Hammerspoon Console and look for lines starting with `usage meter:`. They say whether the script is missing (run `install.sh` again) or the request failed. Run `~/.claude/hooks/claude-usage.sh --fetch` to see the raw result.
 

@@ -122,7 +122,8 @@ Open `~/.hammerspoon/claude_ping.lua` and edit the `M.config` block at the top: 
 
 - **Idle:** nothing runs. Hammerspoon sits at 0% CPU, waiting for a signal.
 - **Claude Code hook:** one `curl` that lives for a fraction of a second. Background sessions add one `ps` call.
-- **Border and card:** created when needed and removed when closed. The blink runs 8 times, then stops.
+- **Border and card:** created when needed and removed when closed, and their memory is freed right away. The border is four thin strips along the edges, not a window over the whole screen. The blink runs 8 times, then stops.
+- **Memory:** Hammerspoon stays around 30–50 MB.
 - **Claude Desktop:** checked every 2.5 s, only while Claude is answering and you are in another app. One check takes about 10–20 ms. It stops by itself when Claude is done.
 - **Usage meter:** one small HTTPS request after Claude finishes, at most once a minute. A once-a-minute timer only updates the "time left" text.
 - **Network:** the hook server only listens on `127.0.0.1` and ignores requests without a custom header, so web pages can't trigger it. The only request that leaves your Mac is the usage request to `api.anthropic.com`.

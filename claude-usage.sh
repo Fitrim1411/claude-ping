@@ -23,9 +23,10 @@ RAW=""
 # The token goes to curl on stdin (not as an argument), so it never shows up in the process list.
 printf 'header = "Authorization: Bearer %s"\n' "$TOK" | curl -s -f -m 8 -K - \
   -H "anthropic-beta: oauth-2025-04-20" "https://api.anthropic.com/api/oauth/usage" |
-jq -c 'def win: select(. != null and .utilization != null)
-         | { used_percentage: .utilization,
-             resets_at: (.resets_at | sub("\\.[0-9]+"; "") | sub("\\+00:00$"; "Z") | fromdateiso8601) };
+jq -c 'def win: if . == null or .utilization == null then null   # a missing window must not empty the output
+         else { used_percentage: .utilization,
+                resets_at: (.resets_at | if . == null then null   # null right after a reset, until you use Claude again
+                              else sub("\\.[0-9]+"; "") | sub("\\+00:00$"; "Z") | fromdateiso8601 end) } end;
        { five_hour: (.five_hour | win), seven_day: (.seven_day | win),
          breakdown: [ (.seven_day_breakdown.rows // [])[] | select(.percent > 0)
                       | { name: .display_name, pct: .percent } ] }' 2>/dev/null

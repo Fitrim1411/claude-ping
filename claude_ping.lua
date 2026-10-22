@@ -281,26 +281,48 @@ local function removeByKey(key)
 end
 
 -- ───────────────────────────── Drawing ─────────────────────────────
+-- The border is four thin strips along the screen edges instead of one see-through canvas
+-- over the whole screen: a full-screen canvas costs 15–60 MB of graphics memory per screen
+-- and makes macOS composite the whole screen; the four strips together need about 1 MB.
 local function makeBorder(scr, color)
   local f = scr:fullFrame()
   local w = M.config.borderWidth
+  local t = w * 2   -- visible thickness: the strokes are centered on the screen edge, half is clipped
   local glow = {}
   for k, v in pairs(color) do glow[k] = v end
   glow.alpha = 0.28
-  local c = hs.canvas.new({ x = f.x, y = f.y, w = f.w, h = f.h })
-  if not c then return nil end
-  -- The stroke is centered on the canvas edge, so half is clipped: visible width = w.
-  c:appendElements({
-    { type = "rectangle", action = "stroke", strokeColor = glow,  strokeWidth = w * 4,
-      frame = { x = 0, y = 0, w = f.w, h = f.h } },
-    { type = "rectangle", action = "stroke", strokeColor = color, strokeWidth = w * 2,
-      frame = { x = 0, y = 0, w = f.w, h = f.h } },
-  })
-  -- Without a mouseCallback this canvas is click-through (hs.canvas default).
-  c:behaviorAsLabels({ "canJoinAllSpaces", "stationary", "fullScreenAuxiliary" })
-  c:level("overlay")
-  c:show(0.15)
-  return c
+  -- Each strip draws the same screen-sized rectangle, shifted so only its own edge shows.
+  local strips = {
+    { x = f.x,           y = f.y,           w = f.w, h = t,           dx = 0,       dy = 0 },        -- top
+    { x = f.x,           y = f.y + f.h - t, w = f.w, h = t,           dx = 0,       dy = t - f.h },  -- bottom
+    { x = f.x,           y = f.y + t,       w = t,   h = f.h - 2 * t, dx = 0,       dy = -t },       -- left
+    { x = f.x + f.w - t, y = f.y + t,       w = t,   h = f.h - 2 * t, dx = t - f.w, dy = -t },       -- right
+  }
+  local out = {}
+  for _, s in ipairs(strips) do
+    local c = hs.canvas.new({ x = s.x, y = s.y, w = s.w, h = s.h })
+    if c then
+      local box = { x = s.dx, y = s.dy, w = f.w, h = f.h }
+      c:appendElements({
+        { type = "rectangle", action = "stroke", strokeColor = glow,  strokeWidth = w * 4, frame = box },
+        { type = "rectangle", action = "stroke", strokeColor = color, strokeWidth = w * 2, frame = box },
+      })
+      -- Without a mouseCallback this canvas is click-through (hs.canvas default).
+      c:behaviorAsLabels({ "canJoinAllSpaces", "stationary", "fullScreenAuxiliary" })
+      c:level("overlay")
+      c:show(0.15)
+      out[#out + 1] = c
+    end
+  end
+  return out
+end
+
+-- hs.canvas releases a deleted canvas's graphics memory only when Lua's garbage collector
+-- frees the object, and with Hammerspoon's tiny Lua heap that can take days (Hammerspoon once
+-- grew to 3.6 GB). So collect once, shortly after canvases are thrown away. Takes a few ms.
+local function collectDeleted(delay)
+  if M.gcTimer then pending[M.gcTimer] = nil; M.gcTimer:stop() end
+  M.gcTimer = later(delay or 2, function() M.gcTimer = nil; collectgarbage("collect") end)
 end
 
 local function headerText()
@@ -425,6 +447,7 @@ end
 
 function M.render()
   updateMenubar()
+  if #M.borders > 0 or M.card then collectDeleted() end
   for _, c in ipairs(M.borders) do c:delete() end
   M.borders = {}
   if M.card then M.card:delete() M.card = nil end
@@ -433,8 +456,7 @@ function M.render()
 
   local color = COLORS[mostUrgent()]
   for _, scr in ipairs(hs.screen.allScreens()) do
-    local b = makeBorder(scr, color)
-    if b then M.borders[#M.borders + 1] = b end
+    for _, b in ipairs(makeBorder(scr, color)) do M.borders[#M.borders + 1] = b end
   end
   M.card = makeCard(hs.mouse.getCurrentScreen() or hs.screen.mainScreen(), color)
 end
@@ -491,6 +513,7 @@ local function notify(m)
     removeByKey(m.key)
     hs.alert.show(ICONS[m.kind] .. "  " .. (m.title or "Claude"), { textSize = 18, radius = 10 },
       hs.screen.mainScreen(), 2.5)
+    collectDeleted(4)   -- the toast is a canvas too; free it once it has faded out
     return
   end
   M.addMarker(m)
@@ -1028,8 +1051,9 @@ function M.fetchUsage(force)
     end
     M.usageTask = hs.task.new(USAGE_SCRIPT, function(code, out)
       M.usageTask = nil
-      local ok, data = pcall(hs.json.decode, out or "")
-      if code == 0 and ok and type(data) == "table" then M.handleUsage(data) return end
+      local ok, data = false, nil
+      if code == 0 and (out or ""):find("{", 1, true) then ok, data = pcall(hs.json.decode, out) end
+      if ok and type(data) == "table" then M.handleUsage(data) return end
       -- Keep the last numbers on screen, but leave a trace so a failure is never silent.
       log("usage meter: fetch failed (exit " .. tostring(code) .. "); keeping the last numbers")
     end, { "--fetch" })

@@ -991,10 +991,13 @@ local function updateUsageBar()
     M.usageBar:setTooltip("Claude usage (5-hour limit)")
     M.usageBar:setMenu(function() M.fetchUsage(); return M.usageMenu() end)
   end
+  M.usageBar:setTooltip(M.usageError and ("Claude usage — not updating: " .. M.usageError)
+                        or "Claude usage (5-hour limit)")
   local w = usageWindow("five_hour")
   if not w then M.usageBar:setTitle("–%") return end
   local p = math.floor(w.pct + 0.5)
-  local title = p .. "%"
+  -- "?" = the last fetch failed, so the number may be out of date (the menu says why).
+  local title = p .. "%" .. (M.usageError and "?" or "")
   if w.resets then title = title .. " · " .. shortLeft(w.resets) end
   local c = pctColor(p)
   if c then
@@ -1031,6 +1034,13 @@ end
 -- Desktop, browser). At most once a minute; nothing runs while Claude is idle.
 local USAGE_SCRIPT = HOME .. "/.claude/hooks/claude-usage.sh"
 M.usageFetchedAt = 0
+-- Exit codes of claude-usage.sh → what the meter's menu says.
+local USAGE_ERRORS = {
+  [1] = "can't read Claude Code's login from the Keychain",
+  [3] = "Claude Code's login has expired; it renews the next time you use Claude Code",
+  [4] = "can't reach Anthropic's server",
+  [5] = "unexpected answer from Anthropic's server",
+}
 
 function M.fetchUsage(force)
   if not M.state.usageMeter then return end
@@ -1053,9 +1063,11 @@ function M.fetchUsage(force)
       M.usageTask = nil
       local ok, data = false, nil
       if code == 0 and (out or ""):find("{", 1, true) then ok, data = pcall(hs.json.decode, out) end
-      if ok and type(data) == "table" then M.handleUsage(data) return end
-      -- Keep the last numbers on screen, but leave a trace so a failure is never silent.
-      log("usage meter: fetch failed (exit " .. tostring(code) .. "); keeping the last numbers")
+      if ok and type(data) == "table" then M.usageError = nil; M.handleUsage(data) return end
+      -- Keep the last numbers on screen, marked with "?", and say why in the menu and the log.
+      M.usageError = USAGE_ERRORS[code] or USAGE_ERRORS[5]
+      log("usage meter: " .. M.usageError .. " (exit " .. tostring(code) .. "); keeping the last numbers")
+      updateUsageBar()
     end, { "--fetch" })
     if not M.usageTask or not M.usageTask:start() then
       M.usageTask = nil
@@ -1093,13 +1105,18 @@ end
 
 function M.usageMenu()
   local items = {}
+  if M.usageError then
+    items[#items + 1] = { title = "⚠️  Not updating: " .. M.usageError, disabled = true }
+    items[#items + 1] = { title = "-" }
+  end
   for _, win in ipairs(WINDOWS) do
     local w = usageWindow(win.key)
     if w then
       local p = math.floor(w.pct + 0.5)
       local bar = string.rep("▰", math.floor(p / 10 + 0.5)) .. string.rep("▱", 10 - math.floor(p / 10 + 0.5))
       items[#items + 1] = { title = string.format("%s:  %s  %d%% used", win.long, bar, p), disabled = true }
-      items[#items + 1] = { title = w.wasReset and "      Reset — new window starts with your next message"
+      -- No reset time = no window running (it has reset, or nothing was used yet).
+      items[#items + 1] = { title = (w.wasReset or not w.resets) and "      Reset — new window starts with your next message"
                                     or ("      Resets " .. ((w.resets - os.time() >= 86400) and "" or "in ") .. untilText(w.resets)),
                             disabled = true }
     else

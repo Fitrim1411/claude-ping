@@ -40,7 +40,7 @@ Claude Ping is a [Hammerspoon](https://www.hammerspoon.org) module written in Lu
 2. **Claude Desktop** has no hooks, and its Code tab runs sessions in a VM. So Claude Ping watches the window through macOS Accessibility, but only after you leave Claude Desktop and only while Claude is still answering. When the Stop button turns back into Send, Claude is done.
 3. **claude.ai** in a browser uses an optional userscript that watches for the same Stop button.
 4. To jump to the right place, Claude Ping matches the session's project folder against the window titles of VS Code, Cursor and common terminals, on any screen.
-5. The **usage meter** is refreshed once, right after Claude finishes. It asks the same endpoint that Claude Code's `/usage` command uses.
+5. The **usage meter** is refreshed once, right after Claude finishes. It asks the same endpoint that Claude Code's `/usage` command uses, with Claude Code's login. If that login has expired because Claude Code hasn't run for some hours, the meter shows a `?` (like `9%?`) until you use Claude Code again.
 
 Everything is event-driven. Nothing is polled while Claude is idle.
 
@@ -152,7 +152,9 @@ hs -c "ClaudePing.debugDesktop(true)"   # list Claude Desktop's button labels in
 
 **Everything disappeared from the menu bar.** Hammerspoon is not running, usually after a restart with **Launch Hammerspoon at login** turned off. Open Hammerspoon and check that option in its **Preferences**. Reminders that were showing before it closed are not kept.
 
-**The usage meter is stuck.** Open the Hammerspoon Console and look for lines starting with `usage meter:`. They say whether the script is missing (run `install.sh` again) or the request failed. Run `~/.claude/hooks/claude-usage.sh --fetch` to see the raw result.
+**The usage meter shows `?`.** The last update failed, so the number may be old. Click the meter to see why. Most often Claude Code's login has expired because Claude Code hasn't run for some hours, for example after the Mac was off overnight and you only used Claude Desktop. Claude Code renews it by itself the next time you use it, and the meter updates right after that reply. Claude Ping never renews the login itself, because that would sign Claude Code out.
+
+**The usage meter is stuck.** Open the Hammerspoon Console and look for lines starting with `usage meter:`. They say whether the script is missing (run `install.sh` again) or why the request failed. Run `~/.claude/hooks/claude-usage.sh --fetch` to see the raw result.
 
 ## Uninstall
 
